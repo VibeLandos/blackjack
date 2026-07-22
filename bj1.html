@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Блэкджек — Мультиплеер</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: radial-gradient(circle at center, #0d5c2e 0%, #063d1c 100%);
+    color: white;
+    min-height: 100vh;
+    padding: 15px;
+    overflow-x: hidden;
+  }
+  h1 {
+    text-align: center;
+    text-shadow: 2px 2px 8px rgba(0,0,0,0.6);
+    margin-bottom: 15px;
+    font-size: 2rem;
+  }
+
+  /* --- ЭКРАН НАСТРОЙКИ --- */
+  .setup {
+    max-width: 500px;
+    margin: 20px auto;
+    background: rgba(0,0,0,0.35);
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  .setup h2 { margin-bottom: 15px; text-align: center; }
+  .setup-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+  .setup-row input, .setup-row select {
+    flex: 1;
+    min-width: 120px;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    background: rgba(255,255,255,0.9);
+    color: #222;
+  }
+  .setup-row button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    background: #ffca28;
+    color: #222;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .player-list {
+    list-style: none;
+    margin-bottom: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .player-list li {
+    background: rgba(255,255,255,0.1);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .player-list li button {
+    background: #e53935;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  .start-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.1rem;
+    background: #43a047;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .clear-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 0.9rem;
+    background: #757575;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  /* --- ИГРОВОЙ ЭКРАН --- */
+  .game { display: none; max-width: 1100px; margin: 0 auto; }
+  .game.active { display: block; }
+  .setup.hidden { display: none; }
+
+  .dealer-area {
+    background: rgba(0,0,0,0.25);
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .dealer-area h2 { margin-bottom: 10px; font-size: 1.2rem; }
+
+  .players-area {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  .player-box {
+    background: rgba(0,0,0,0.25);
+    border-radius: 15px;
+    padding: 15px;
+    text-align: center;
+    border: 3px solid transparent;
+    transition: all 0.4s;
+    position: relative;
+  }
+  .player-box.active {
+    border-color: #ffca28;
+    box-shadow: 0 0 25px rgba(255,202,40,0.6);
+    transform: scale(1.02);
+  }
+  .player-box.finished { opacity: 0.7; }
+  .player-box.winner {
+    border-color: #69f0ae;
+    box-shadow: 0 0 30px rgba(105,240,174,0.8);
+  }
+  .player-box h3 { margin-bottom: 8px; font-size: 1.1rem; }
+  .player-box .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    margin-left: 5px;
+    background: #1976d2;
+  }
+  .player-box .badge.bot { background: #7b1fa2; }
+
+  .cards {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    min-height: 120px;
+    flex-wrap: wrap;
+    perspective: 1000px;
+  }
+
+  /* --- КАРТЫ И АНИМАЦИИ --- */
+  .card {
+    width: 70px;
+    height: 100px;
+    background-color: white;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 6px;
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.4);
+    font-size: 1.2rem;
+    font-weight: bold;
+    position: relative;
+    transform-origin: center;
+  }
+  .card.new {
+    animation: dealCard 0.6s ease-out;
+  }
+  @keyframes dealCard {
+    0% {
+      transform: translate(-200px, -300px) rotate(-360deg) scale(0.3);
+      opacity: 0;
+    }
+    60% { opacity: 1; }
+    100% {
+      transform: translate(0, 0) rotate(0) scale(1);
+      opacity: 1;
+    }
+  }
+  .card.red { color: #d32f2f; }
+  .card.black { color: #212121; }
+  .card .top-left { align-self: flex-start; line-height: 1; font-size: 0.9rem; }
+  .card .bottom-right { align-self: flex-end; transform: rotate(180deg); line-height: 1; font-size: 0.9rem; }
+  .card .center { font-size: 2rem; text-align: center; }
+
+  .card.hidden {
+    background: repeating-linear-gradient(45deg, #1565c0, #1565c0 10px, #0d47a1 10px, #0d47a1 20px);
+    color: transparent;
+  }
+  .card.flip {
+    animation: flipCard 0.7s ease-in-out;
+  }
+  @keyframes flipCard {
+    0% { transform: rotateY(0); }
+    50% { transform: rotateY(90deg); background: repeating-linear-gradient(45deg, #1565c0, #1565c0 10px, #0d47a1 10px, #0d47a1 20px); color: transparent; }
+    100% { transform: rotateY(0); }
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+  }
+  button.action {
+    padding: 12px 22px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  button.action:active { transform: scale(0.95); }
+  button.action:disabled { opacity: 0.4; cursor: not-allowed; }
+  #hit-btn { background: #ffca28; color: #222; }
+  #stand-btn { background: #e53935; color: white; }
+  #new-game-btn { background: #43a047; color: white; }
+
+  #message {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: bold;
+    min-height: 35px;
+    margin: 10px 0;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+    animation: popIn 0.5s;
+  }
+  @keyframes popIn {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .win { color: #69f0ae; }
+  .lose { color: #ff5252; }
+  .push { color: #fff59d; }
+
+  .result-tag {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    animation: slideUp 0.5s ease-out;
+  }
+  @keyframes slideUp {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  .result-tag.win { background: #2e7d32; }
+  .result-tag.lose { background: #c62828; }
+  .result-tag.push { background: #f57f17; color: #222; }
+</style>
+</head>
+<body>
+
+<h1>♠ Блэкджек ♥</h1>
+
+<!-- ЭКРАН НАСТРОЙКИ -->
+<div class="setup" id="setup">
+  <h2>Добавьте игроков</h2>
+  <div class="setup-row">
+    <input type="text" id="player-name" placeholder="Имя игрока" maxlength="15">
+    <select id="player-type">
+      <option value="human">Человек</option>
+      <option value="bot">Бот</option>
+    </select>
+    <button onclick="addPlayer()">+</button>
+  </div>
+  <ul class="player-list" id="player-list"></ul>
+  <button class="start-btn" id="start-btn" onclick="startGame()" disabled>Начать игру</button>
+  <button class="clear-btn" onclick="clearPlayers()">Очистить список</button>
+</div>
+
+<!-- ИГРОВОЙ ЭКРАН -->
+<div class="game" id="game">
+  <div class="dealer-area">
+    <h2>Дилер (<span id="dealer-score">0</span>)</h2>
+    <div id="dealer-cards" class="cards"></div>
+  </div>
+
+  <div id="message">Добро пожаловать!</div>
+
+  <div class="players-area" id="players-area"></div>
+
+  <div class="controls">
+    <button class="action" id="hit-btn" onclick="playerHit()">Ещё</button>
+    <button class="action" id="stand-btn" onclick="playerStand()">Хватит</button>
+    <button class="action" id="new-game-btn" onclick="backToSetup()">Новая игра</button>
+  </div>
+</div>
+
+<script>
+// ============ СОСТОЯНИЕ ============
+let players = [];          // [{name, type, hand, finished, result, cardIds}]
+let deck = [];
+let dealerHand = [];
+let dealerCardIds = [];
+let currentPlayerIndex = 0;
+let gameActive = false;
+let cardIdCounter = 0;
+
+const suits = ['♠', '♥', '♦', '♣'];
+const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+
+// ============ НАСТРОЙКА ИГРОКОВ ============
+function addPlayer() {
+  const nameInput = document.getElementById('player-name');
+  const typeSelect = document.getElementById('player-type');
+  const name = nameInput.value.trim() || `Игрок ${players.length + 1}`;
+  if (players.length >= 6) { alert('Максимум 6 игроков'); return; }
+  if (players.some(p => p.name === name)) { alert('Такое имя уже есть'); return; }
+
+  players.push({ name, type: typeSelect.value, hand: [], finished: false, result: null, cardIds: [] });
+  nameInput.value = '';
+  renderSetup();
+}
+
+function removePlayer(index) {
+  players.splice(index, 1);
+  renderSetup();
+}
+
+function clearPlayers() {
+  if (confirm('Очистить список игроков?')) {
+    players = [];
+    renderSetup();
+  }
+}
+
+function renderSetup() {
+  const list = document.getElementById('player-list');
+  list.innerHTML = players.map((p, i) => `
+    <li>
+      <span>${p.name} <span class="badge ${p.type === 'bot' ? 'bot' : ''}">${p.type === 'bot' ? '🤖 Бот' : '👤 Человек'}</span></span>
+      <button onclick="removePlayer(${i})">✕</button>
+    </li>
+  `).join('');
+  document.getElementById('start-btn').disabled = players.length === 0;
+}
+
+function backToSetup() {
+  document.getElementById('setup').classList.remove('hidden');
+  document.getElementById('game').classList.remove('active');
+  // НЕ очищаем players - они сохраняются
+  renderSetup();
+}
+
+// ============ КОЛОДА ============
+function createDeck() {
+  let d = [];
+  for (let s of suits) for (let r of ranks) d.push({ suit: s, rank: r });
+  return [...d, ...d].map(c => ({...c}));
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ============ ПОДСЧЁТ ============
+function calcScore(hand) {
+  let score = 0, aces = 0;
+  for (let c of hand) {
+    if (['J','Q','K'].includes(c.rank)) score += 10;
+    else if (c.rank === 'A') { score += 11; aces++; }
+    else score += parseInt(c.rank);
+  }
+  while (score > 21 && aces > 0) { score -= 10; aces--; }
+  return score;
+}
+
+// ============ РЕНДЕР КАРТ ============
+function renderCard(card, hidden = false, isNew = false, cardId = '') {
+  if (hidden) return `<div class="card hidden" data-card-id="${cardId}"></div>`;
+  const isRed = card.suit === '♥' || card.suit === '♦';
+  const newClass = isNew ? 'new' : '';
+  return `
+    <div class="card ${isRed ? 'red' : 'black'} ${newClass}" data-card-id="${cardId}">
+      <div class="top-left">${card.rank}${card.suit}</div>
+      <div class="center">${card.suit}</div>
+      <div class="bottom-right">${card.rank}${card.suit}</div>
+    </div>`;
+}
+
+function updateDealerCards(animateNew = false) {
+  const dealerEl = document.getElementById('dealer-cards');
+  const existingIds = new Set(Array.from(dealerEl.children).map(el => el.dataset.cardId));
+  
+  dealerEl.innerHTML = dealerHand.map((c, i) => {
+    const hide = (i === 1 && gameActive);
+    const cardId = dealerCardIds[i];
+    const isNew = animateNew && !existingIds.has(cardId);
+    return renderCard(c, hide, isNew, cardId);
+  }).join('');
+  
+  document.getElementById('dealer-score').textContent =
+    gameActive ? calcScore([dealerHand[0]]) : calcScore(dealerHand);
+}
+
+function updatePlayerCards(playerIndex, animateNew = false) {
+  const p = players[playerIndex];
+  const playerBox = document.querySelector(`.player-box[data-player-index="${playerIndex}"]`);
+  if (!playerBox) return;
+  
+  const cardsEl = playerBox.querySelector('.cards');
+  const existingIds = new Set(Array.from(cardsEl.children).map(el => el.dataset.cardId));
+  
+  cardsEl.innerHTML = p.hand.map((c, i) => {
+    const cardId = p.cardIds[i];
+    const isNew = animateNew && !existingIds.has(cardId);
+    return renderCard(c, false, isNew, cardId);
+  }).join('');
+  
+  playerBox.querySelector('h3').innerHTML = `${p.name} (${calcScore(p.hand)})
+    <span class="badge ${p.type === 'bot' ? 'bot' : ''}">${p.type === 'bot' ? '🤖' : '👤'}</span>`;
+}
+
+function renderAll(animateNewCards = false) {
+  updateDealerCards(animateNewCards);
+
+  const area = document.getElementById('players-area');
+  
+  // Создаём или обновляем блоки игроков
+  players.forEach((p, i) => {
+    let playerBox = document.querySelector(`.player-box[data-player-index="${i}"]`);
+    
+    if (!playerBox) {
+      // Создаём новый блок
+      const div = document.createElement('div');
+      div.className = 'player-box';
+      div.dataset.playerIndex = i;
+      div.innerHTML = `
+        <h3>${p.name} (${calcScore(p.hand)})
+          <span class="badge ${p.type === 'bot' ? 'bot' : ''}">${p.type === 'bot' ? '🤖' : '👤'}</span>
+        </h3>
+        <div class="cards"></div>
+      `;
+      area.appendChild(div);
+      playerBox = div;
+    }
+    
+    // Обновляем классы
+    const isActive = gameActive && i === currentPlayerIndex && !p.finished;
+    playerBox.classList.toggle('active', isActive);
+    playerBox.classList.toggle('finished', p.finished);
+    playerBox.classList.toggle('winner', p.result === 'win' && !gameActive);
+    
+    // Обновляем карты
+    updatePlayerCards(i, animateNewCards);
+    
+    // Обновляем результат
+    const existingResult = playerBox.querySelector('.result-tag');
+    if (p.result && !existingResult) {
+      const resultDiv = document.createElement('div');
+      resultDiv.className = `result-tag ${p.result}`;
+      resultDiv.textContent = resultText(p.result);
+      playerBox.appendChild(resultDiv);
+    } else if (!p.result && existingResult) {
+      existingResult.remove();
+    }
+  });
+
+  // Удаляем лишние блоки
+  const allBoxes = area.querySelectorAll('.player-box');
+  allBoxes.forEach((box, i) => {
+    if (i >= players.length) box.remove();
+  });
+
+  // Кнопки
+  const isHumanTurn = gameActive && players[currentPlayerIndex]?.type === 'human' && !players[currentPlayerIndex]?.finished;
+  document.getElementById('hit-btn').disabled = !isHumanTurn;
+  document.getElementById('stand-btn').disabled = !isHumanTurn;
+}
+
+function resultText(r) {
+  return r === 'win' ? '🏆 Победа' : r === 'lose' ? '💥 Проигрыш' : '🤝 Ничья';
+}
+
+// ============ СТАРТ ИГРЫ ============
+function startGame() {
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('game').classList.add('active');
+
+  deck = shuffle(createDeck());
+  dealerHand = [deck.pop(), deck.pop()];
+  dealerCardIds = [cardIdCounter++, cardIdCounter++];
+  
+  players.forEach(p => {
+    p.hand = [deck.pop(), deck.pop()];
+    p.cardIds = [cardIdCounter++, cardIdCounter++];
+    p.finished = false;
+    p.result = null;
+  });
+  
+  currentPlayerIndex = 0;
+  gameActive = true;
+
+  // Очищаем предыдущие результаты из DOM
+  document.querySelectorAll('.result-tag').forEach(el => el.remove());
+  
+  setMessage('Игра началась!', '');
+  renderAll(true); // Анимация раздачи
+    
+  setTimeout(() => processCurrentPlayer(), 800);
+}
+
+// ============ ХОД ИГРОКА ============
+function processCurrentPlayer() {
+  if (!gameActive) return;
+  if (currentPlayerIndex >= players.length) {
+    dealerTurn();
+    return;
+  }
+  const p = players[currentPlayerIndex];
+  renderAll();
+
+  // Проверка на блэкджек с раздачи
+  if (calcScore(p.hand) === 21) {
+    p.finished = true;
+    setMessage(`${p.name} — Блэкджек!`, 'win');
+    setTimeout(() => { currentPlayerIndex++; processCurrentPlayer(); }, 1200);
+    return;
+  }
+
+  if (p.type === 'bot') {
+    setMessage(`Ход: ${p.name} (бот думает...)`, '');
+    setTimeout(botPlay, 1000);
+  } else {
+    setMessage(`Ход: ${p.name} — ваш выбор`, '');
+  }
+}
+
+function playerHit() {
+  if (!gameActive) return;
+  const p = players[currentPlayerIndex];
+  const newCard = deck.pop();
+  p.hand.push(newCard);
+  p.cardIds.push(cardIdCounter++);
+  renderAll(true); // Анимация только новой карты
+  
+  if (calcScore(p.hand) > 21) {
+    p.finished = true;
+    p.result = 'lose';
+    setMessage(`${p.name} — перебор! 💥`, 'lose');
+    setTimeout(nextPlayer, 1200);
+  }
+}
+
+function playerStand() {
+  if (!gameActive) return;
+  players[currentPlayerIndex].finished = true;
+  nextPlayer();
+}
+
+function nextPlayer() {
+  currentPlayerIndex++;
+  processCurrentPlayer();
+}
+
+// ============ БОТ ============
+function botPlay() {
+  if (!gameActive) return;
+  const p = players[currentPlayerIndex];
+  const score = calcScore(p.hand);
+  if (score < 17) {
+    const newCard = deck.pop();
+    p.hand.push(newCard);
+    p.cardIds.push(cardIdCounter++);
+    renderAll(true); // Анимация только новой карты
+    
+    if (calcScore(p.hand) > 21) {
+      p.finished = true;
+      p.result = 'lose';
+      setMessage(`${p.name} — перебор! 💥`, 'lose');
+      setTimeout(nextPlayer, 1200);
+    } else {
+      setTimeout(botPlay, 900);
+    }
+  } else {
+    p.finished = true;
+    setMessage(`${p.name} — хватает`, '');
+    setTimeout(nextPlayer, 900);
+  }
+}
+
+// ============ ХОД ДИЛЕРА ============
+function dealerTurn() {
+  setMessage('Ход дилера...', '');
+  renderAll();
+  
+  // Открываем вторую карту — анимация переворота
+  setTimeout(() => {
+    const dealerCardsEl = document.getElementById('dealer-cards');
+    const hiddenCard = dealerCardsEl.children[1];
+    if (hiddenCard) {
+      hiddenCard.classList.add('flip');
+      setTimeout(() => {
+        hiddenCard.outerHTML = renderCard(dealerHand[1], false, false, dealerCardIds[1]);
+        document.getElementById('dealer-score').textContent = calcScore(dealerHand);
+      }, 350);
+    }
+
+    // Добор до 17
+    setTimeout(() => dealerDraw(), 800);
+  }, 500);
+}
+
+function dealerDraw() {
+  if (calcScore(dealerHand) < 17) {
+    const newCard = deck.pop();
+    dealerHand.push(newCard);
+    dealerCardIds.push(cardIdCounter++);
+    updateDealerCards(true); // Анимация только новой карты
+    setTimeout(dealerDraw, 800);
+  } else {
+    resolveGame();
+  }
+}
+
+// ============ ИТОГИ ============
+function resolveGame() {
+  gameActive = false;
+  const dealerScore = calcScore(dealerHand);
+  const dealerBust = dealerScore > 21;
+
+  players.forEach(p => {
+    if (p.result === 'lose') return; // уже перебор
+    const ps = calcScore(p.hand);
+    if (dealerBust) p.result = 'win';
+    else if (ps > dealerScore) p.result = 'win';
+    else if (ps < dealerScore) p.result = 'lose';
+    else p.result = 'push';
+  });
+
+  renderAll();
+
+  const wins = players.filter(p => p.result === 'win').map(p => p.name).join(', ');
+  if (wins) setMessage(`Победители: ${wins} 🏆`, 'win');
+  else setMessage('Никто не выиграл в этот раз', 'push');
+}
+
+// ============ СООБЩЕНИЯ ============
+function setMessage(text, cls) {
+  const el = document.getElementById('message');
+  el.textContent = text;
+  el.className = cls;
+  // перезапуск анимации
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
+}
+</script>
+</body>
+</html>
